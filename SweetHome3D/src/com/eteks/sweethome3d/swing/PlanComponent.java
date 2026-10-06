@@ -129,7 +129,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
-import javax.swing.JApplet;
 import javax.swing.JComponent;
 import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
@@ -2002,13 +2001,54 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
     }
     return strokeWidth;
   }
-  
+
   /**
-   * Prints this component plan at the scale given in the home print attributes or at a scale 
+   * Prints this component plan at the scale given in the home print attributes or at a scale
    * that makes it fill <code>pageFormat</code> imageable size if this attribute is <code>null</code>.
+   * <p>
+   * When the home contains levels and no explicit plan scale is set, one page is printed
+   * for each level. The originally selected level is restored before the method returns.
    */
   public int print(Graphics g, PageFormat pageFormat, int pageIndex) {
-    List<Selectable> printedItems = getPaintedItems(); 
+    List<Level> levels = this.home.getLevels();
+    // When home has levels and no explicit plan scale is set, print one page per level.
+    // Setting the selected level temporarily lets us reuse the existing painting logic
+    // that filters items based on the selected level (see isViewableAtSelectedLevel).
+    if (!levels.isEmpty()
+            && (this.home.getPrint() == null
+            || this.home.getPrint().getPlanScale() == null)) {
+      if (pageIndex >= levels.size()) {
+        return NO_SUCH_PAGE;
+      }
+      Level originalSelectedLevel = this.home.getSelectedLevel();
+      boolean originalAllLevelsSelection = this.home.isAllLevelsSelection();
+      try {
+        this.home.setSelectedLevel(levels.get(pageIndex));
+        this.home.setAllLevelsSelection(false);
+        // Plan bounds cache is not invalidated by the SELECTED_LEVEL listener
+        // (see addModelListeners), so invalidate it here to force recomputation.
+        this.planBoundsCacheValid = false;
+        // The selected level filters which items are actually painted.
+        // Here pageIndex is consumed by the level loop, so pass 0 to the inner print.
+        return printLevelPlan(g, pageFormat, 0);
+      } finally {
+        this.home.setSelectedLevel(originalSelectedLevel);
+        this.home.setAllLevelsSelection(originalAllLevelsSelection);
+        // Invalidate caches that depend on the selected level so that the plan
+        // displayed on screen matches the restored selected level again.
+        this.planBoundsCacheValid = false;
+      }
+    } else {
+      return printLevelPlan(g, pageFormat, pageIndex);
+    }
+  }
+
+  /**
+   * Prints the plan of the currently selected level, tiling across pages according to
+   * the plan scale specified in home print attributes (or fitting one page otherwise).
+   */
+  private int printLevelPlan(Graphics g, PageFormat pageFormat, int pageIndex) {
+    List<Selectable> printedItems = getPaintedItems();
     Rectangle2D printedItemBounds = getItemsBounds(g, printedItems);
     if (printedItemBounds != null) {
       double imageableX = pageFormat.getImageableX();
@@ -2047,7 +2087,7 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
         rowIndex = pageIndex / pagesPerRow;
         columnIndex = pageIndex - rowIndex * pagesPerRow;
       }
-          
+
       Graphics2D g2D = (Graphics2D)g.create();
       g2D.clip(new Rectangle2D.Double(imageableX, imageableY, imageableWidth, imageableHeight));
       // Change coordinates system to paper imageable origin
@@ -2055,19 +2095,19 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
       g2D.scale(printScale, printScale);
       float extraMargin = getStrokeWidthExtraMargin(printedItems, PaintMode.PRINT);
       g2D.translate(-printedItemBounds.getMinX() + extraMargin,
-          -printedItemBounds.getMinY() + extraMargin);
+              -printedItemBounds.getMinY() + extraMargin);
       // Center plan in component if possible
-      g2D.translate(Math.max(0, 
-              (imageableWidth * pagesPerRow / printScale - printedItemBounds.getWidth() - 2 * extraMargin) / 2), 
-          Math.max(0, 
-              (imageableHeight * pagesPerColumn / printScale - printedItemBounds.getHeight() - 2 * extraMargin) / 2));
+      g2D.translate(Math.max(0,
+                      (imageableWidth * pagesPerRow / printScale - printedItemBounds.getWidth() - 2 * extraMargin) / 2),
+              Math.max(0,
+                      (imageableHeight * pagesPerColumn / printScale - printedItemBounds.getHeight() - 2 * extraMargin) / 2));
       setRenderingHints(g2D);
       try {
         // Print component contents
         paintContent(g2D, printScale, PaintMode.PRINT);
       } catch (InterruptedIOException ex) {
         // Ignore exception because it may happen only in EXPORT paint mode 
-      }   
+      }
       g2D.dispose();
       return PAGE_EXISTS;
     } else {
@@ -5373,9 +5413,7 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
     this.toolTipWindow.pack();
     // Make the tooltip visible 
     // (except in Applets run with Java 7 under Mac OS X where the tooltips are buggy)
-    this.toolTipWindow.setVisible(!OperatingSystem.isMacOSX()
-        || !OperatingSystem.isJavaVersionGreaterOrEqual("1.7")
-        || SwingUtilities.getAncestorOfClass(JApplet.class, this) == null);
+    this.toolTipWindow.setVisible(true);
     toolTipComponent.paintImmediately(toolTipComponent.getBounds());
   }
   
