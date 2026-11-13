@@ -2022,16 +2022,25 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
       }
       Level originalSelectedLevel = this.home.getSelectedLevel();
       boolean originalAllLevelsSelection = this.home.isAllLevelsSelection();
+      Level levelToPrint = levels.get(pageIndex);
+      boolean originalViewable = levelToPrint.isViewable();
       try {
         this.home.setSelectedLevel(levels.get(pageIndex));
         this.home.setAllLevelsSelection(false);
         // Plan bounds cache is not invalidated by the SELECTED_LEVEL listener
         // (see addModelListeners), so invalidate it here to force recomputation.
+        if (!originalViewable) {
+          levelToPrint.setViewable(true);
+        }
+
         this.planBoundsCacheValid = false;
         // The selected level filters which items are actually painted.
         // Here pageIndex is consumed by the level loop, so pass 0 to the inner print.
         return printLevelPlan(g, pageFormat, 0);
       } finally {
+        if (!originalViewable) {
+          levelToPrint.setViewable(originalViewable);
+        }
         this.home.setSelectedLevel(originalSelectedLevel);
         this.home.setAllLevelsSelection(originalAllLevelsSelection);
         // Invalidate caches that depend on the selected level so that the plan
