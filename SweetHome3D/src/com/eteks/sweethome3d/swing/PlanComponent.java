@@ -129,7 +129,6 @@ import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
-import javax.swing.JApplet;
 import javax.swing.JComponent;
 import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
@@ -5371,12 +5370,8 @@ public class PlanComponent extends JComponent implements PlanView, Scrollable, P
     }
     this.toolTipWindow.setLocation(point);      
     this.toolTipWindow.pack();
-    // Make the tooltip visible 
-    // (except in Applets run with Java 7 under Mac OS X where the tooltips are buggy)
-    this.toolTipWindow.setVisible(!OperatingSystem.isMacOSX()
-        || !OperatingSystem.isJavaVersionGreaterOrEqual("1.7")
-        || SwingUtilities.getAncestorOfClass(JApplet.class, this) == null);
-    toolTipComponent.paintImmediately(toolTipComponent.getBounds());
+    // Make the tooltip visible
+    this.toolTipWindow.setVisible(true);
   }
   
   /**
